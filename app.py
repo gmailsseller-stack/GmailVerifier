@@ -95,6 +95,30 @@ def list_files():
                     })
     
     return jsonify(result)
+
+@app.route('/api/debug', methods=['GET'])
+def debug():
+    import os
+    disabled_path = "/app/data/disabled"
+    files = []
+    
+    if os.path.exists(disabled_path):
+        for f in os.listdir(disabled_path):
+            if f.endswith('.txt'):
+                path = os.path.join(disabled_path, f)
+                with open(path, 'r') as file:
+                    lines = file.readlines()
+                files.append({
+                    'name': f,
+                    'lines': len(lines),
+                    'sample': [l.strip() for l in lines[:3]]
+                })
+    
+    return jsonify({
+        'path_exists': os.path.exists(disabled_path),
+        'disabled_path': disabled_path,
+        'files': files
+    })
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=False)
