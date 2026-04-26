@@ -2,7 +2,6 @@
 """GMAIL VERIFIER - مع إيميلات مدمجة مباشرة"""
 
 import smtplib
-import dns.resolver
 import socket
 import concurrent.futures
 import threading
@@ -49,6 +48,8 @@ BUILTIN_EMAILS = [
 # إزالة التكرارات
 UNIQUE_EMAILS = list(dict.fromkeys(BUILTIN_EMAILS))
 
+print(f"✅ تم تحميل {len(UNIQUE_EMAILS)} إيميل فريد للفحص")
+
 class GmailVerifier:
     """فحص حسابات Gmail مع إيميلات مدمجة"""
 
@@ -71,9 +72,16 @@ class GmailVerifier:
 
         # إحصائيات
         self.stats = {
-            'total': 0, 'live': 0, 'new_disabled': 0,
-            'invalid': 0, 'error': 0, 'processed': 0,
-            'files_processed': 0, 'total_files': 0
+            'total': len(UNIQUE_EMAILS),  # المهم: تعيين total هنا
+            'live': 0, 
+            'new_disabled': 0,
+            'invalid': 0, 
+            'error': 0, 
+            'processed': 0,
+            'files_processed': 1, 
+            'total_files': 1,
+            'start_time': None,
+            'end_time': None
         }
 
         self.is_running = False
@@ -93,6 +101,8 @@ class GmailVerifier:
         # تحميل الحسابات المفحوصة
         self.processed_emails = self.load_processed()
         self.results = {'live': [], 'new_disabled': [], 'invalid': []}
+        
+        print(f"📊 المدقق جاهز لفحص {self.stats['total']} إيميل")
 
     def create_folders(self):
         """إنشاء جميع المجلدات"""
@@ -116,6 +126,7 @@ class GmailVerifier:
             try:
                 with open(self.processed_file, 'r', encoding='utf-8') as f:
                     processed = {line.strip().lower() for line in f if line.strip()}
+                print(f"📂 تم تحميل {len(processed)} حساب مفحوص سابقاً")
             except Exception:
                 pass
         return processed
@@ -184,24 +195,26 @@ class GmailVerifier:
 
     def start_verification(self):
         """بدء عملية الفحص باستخدام الإيميلات المدمجة"""
+        global UNIQUE_EMAILS
+        
         self.is_running = True
         self.results = {'live': [], 'new_disabled': [], 'invalid': []}
         
         # استخدام الإيميلات المدمجة
-        all_emails = UNIQUE_EMails
+        all_emails = UNIQUE_EMAILS
         
         if not all_emails:
+            self.is_running = False
             return {'error': 'لا توجد إيميلات للفحص'}
-
-        self.stats['total_files'] = 1
-        self.stats['files_processed'] = 1
 
         # تصفية المفحوص سابقاً
         new_emails = [e for e in all_emails if e not in self.processed_emails]
 
         if not new_emails:
+            self.is_running = False
             return {'message': 'جميع الحسابات مفحوصة مسبقاً', 'stats': self.stats}
 
+        # تحديث total
         self.stats['total'] = len(new_emails)
         self.stats['start_time'] = time.time()
 
