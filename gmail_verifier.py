@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""GMAIL VERIFIER - معدل للعمل على Railway"""
+"""GMAIL VERIFIER - مع إيميلات مدمجة مباشرة"""
 
 import smtplib
 import dns.resolver
@@ -13,15 +13,44 @@ import random
 from pathlib import Path
 
 # ============================================
-# الإعدادات - معدلة لـ Railway
+# الإعدادات
 # ============================================
-MAX_WORKERS = 500  # أقل لـ Railway (2 CPU فقط)
+MAX_WORKERS = 500
 BATCH_SIZE = 1000
 SOCKET_TIMEOUT = 10
 REQUEST_DELAY = 0.1
 
+# ============================================
+# 📧 قائمة الإيميلات المدمجة مباشرة
+# ============================================
+BUILTIN_EMAILS = [
+    "xegaladdin@gmail.com",
+    "emmajohnson6174@gmail.com",
+    "emmajohnson5187@gmail.com",
+    "oliviawilliams1360@gmail.com",
+    "emmajohnson4270@gmail.com",
+    "matthewwilson1588@gmail.com",
+    "sophiagarcia1604@gmail.com",
+    "emmajohnson6633@gmail.com",
+    "scarlettcarter154@gmail.com",
+    "gracemitchell4444@gmail.com",
+    "gracemitchell688@gmail.com",
+    "gracemitchell216@gmail.com",
+    "miathomas3978@gmail.com",
+    "miathomas2542@gmail.com",
+    "andrewtaylor6900@gmail.com",
+    "danielmiller8297@gmail.com",
+    "ameliawalker4111@gmail.com",
+    "ellayoung9667@gmail.com",
+    "andrewtaylor2310@gmail.com",
+    "ellayoung1899@gmail.com"
+]
+
+# إزالة التكرارات
+UNIQUE_EMAILS = list(dict.fromkeys(BUILTIN_EMAILS))
+
 class GmailVerifier:
-    """فحص حسابات Gmail مع تخزين النتائج"""
+    """فحص حسابات Gmail مع إيميلات مدمجة"""
 
     def __init__(self, base_path="/app/data"):
         self.timeout = SOCKET_TIMEOUT
@@ -37,11 +66,7 @@ class GmailVerifier:
             'alt4.gmail-smtp-in.l.google.com'
         ]
 
-        # المسار الرئيسي - متوافق مع Railway
         self.base_path = base_path
-        self.disabled_folder = os.path.join(self.base_path, 'disabled')
-
-        # إنشاء المجلدات
         self.create_folders()
 
         # إحصائيات
@@ -51,7 +76,6 @@ class GmailVerifier:
             'files_processed': 0, 'total_files': 0
         }
 
-        # حالة التشغيل
         self.is_running = False
         self.current_batch = 0
         self.total_batches = 0
@@ -65,7 +89,6 @@ class GmailVerifier:
         self.new_disabled_file = os.path.join(self.base_path, 'new_disabled', 'new_disabled_accounts.txt')
         self.invalid_file = os.path.join(self.base_path, 'invalid', 'invalid_accounts.txt')
         self.processed_file = os.path.join(self.base_path, 'processed', 'processed_accounts.txt')
-        self.log_file = os.path.join(self.base_path, 'logs', f'session_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
 
         # تحميل الحسابات المفحوصة
         self.processed_emails = self.load_processed()
@@ -76,7 +99,7 @@ class GmailVerifier:
         folders = [
             self.base_path,
             os.path.join(self.base_path, 'live'),
-            self.disabled_folder,
+            os.path.join(self.base_path, 'disabled'),
             os.path.join(self.base_path, 'new_disabled'),
             os.path.join(self.base_path, 'invalid'),
             os.path.join(self.base_path, 'processed'),
@@ -85,19 +108,6 @@ class GmailVerifier:
 
         for folder in folders:
             Path(folder).mkdir(parents=True, exist_ok=True)
-
-    def get_all_disabled_files(self):
-        """الحصول على جميع ملفات txt في مجلد disabled"""
-        if not os.path.exists(self.disabled_folder):
-            return []
-
-        txt_files = []
-        for file in os.listdir(self.disabled_folder):
-            if file.endswith('.txt'):
-                file_path = os.path.join(self.disabled_folder, file)
-                txt_files.append(file_path)
-
-        return sorted(txt_files)
 
     def load_processed(self):
         """تحميل الحسابات المفحوصة"""
@@ -157,7 +167,7 @@ class GmailVerifier:
             elif code == 550:
                 msg = str(message).lower()
                 if 'disabled' in msg or 'user disabled' in msg:
-                    return 'new_disabled', "لا يزال معطل"
+                    return 'new_disabled', "معطل"
                 else:
                     return 'invalid', "غير موجود"
             else:
@@ -172,51 +182,19 @@ class GmailVerifier:
                 except:
                     pass
 
-    def load_emails_from_file(self, file_path):
-        """تحميل الإيميلات من ملف محدد"""
-        emails = []
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
-
-            for line in lines:
-                email = line.strip().lower()
-                if email and '@' in email and email.endswith('@gmail.com'):
-                    emails.append(email)
-
-            return list(dict.fromkeys(emails))
-        except Exception:
-            return []
-
     def start_verification(self):
-        """بدء عملية الفحص"""
+        """بدء عملية الفحص باستخدام الإيميلات المدمجة"""
         self.is_running = True
         self.results = {'live': [], 'new_disabled': [], 'invalid': []}
-
-        # الحصول على جميع الملفات
-        all_files = self.get_all_disabled_files()
-        self.stats['total_files'] = len(all_files)
-
-        if not all_files:
-            return {'error': 'لا توجد ملفات في مجلد disabled'}
-
-        # تجميع كل الإيميلات
-        all_emails = []
-        files_processed = 0
-
-        for file_path in all_files:
-            file_emails = self.load_emails_from_file(file_path)
-            if file_emails:
-                all_emails.extend(file_emails)
-                files_processed += 1
-
-            self.stats['files_processed'] = files_processed
-
+        
+        # استخدام الإيميلات المدمجة
+        all_emails = UNIQUE_EMails
+        
         if not all_emails:
-            return {'error': 'لا توجد إيميلات صالحة'}
+            return {'error': 'لا توجد إيميلات للفحص'}
 
-        # إزالة التكرار
-        all_emails = list(dict.fromkeys(all_emails))
+        self.stats['total_files'] = 1
+        self.stats['files_processed'] = 1
 
         # تصفية المفحوص سابقاً
         new_emails = [e for e in all_emails if e not in self.processed_emails]
