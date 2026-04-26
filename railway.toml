@@ -1,0 +1,16 @@
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+numReplicas = 1
+restartPolicyType = "NEVER"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+
+[deploy.limits]
+cpu = 2
+memory = 1024
+
+# تخزين البيانات
+[volumes.data]
+mountPath = "/app/data"
