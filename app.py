@@ -73,7 +73,28 @@ def download_results(category):
         )
     
     return jsonify({'error': 'File not found'}), 404
-
+@app.route('/api/list-files', methods=['GET'])
+def list_files():
+    import os
+    disabled_path = "/app/data/disabled"
+    result = {
+        'path': disabled_path,
+        'exists': os.path.exists(disabled_path),
+        'files': []
+    }
+    
+    if os.path.exists(disabled_path):
+        for file in os.listdir(disabled_path):
+            if file.endswith('.txt'):
+                file_path = os.path.join(disabled_path, file)
+                with open(file_path, 'r') as f:
+                    lines = f.readlines()
+                    result['files'].append({
+                        'name': file,
+                        'count': len([l for l in lines if '@gmail.com' in l])
+                    })
+    
+    return jsonify(result)
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=False)
