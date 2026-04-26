@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Verifier - فحص حسابات Gmail</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: bold; }
+        .stat-label { font-size: 0.85rem; opacity: 0.9; }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-start { background: #48bb78; color: white; }
+        .btn-stop { background: #f56565; color: white; }
+        .btn:hover { transform: translateY(-2px); opacity: 0.9; }
+        .progress-bar-container {
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #48bb78, #38a169);
+            width: 0%;
+            height: 30px;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .results-section {
+            margin-top: 30px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: #e2e8f0;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .tab.active { background: #667eea; color: white; }
+        .results-list {
+            background: #f7fafc;
+            border-radius: 15px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result-item {
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            font-family: monospace;
+        }
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .button-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Gmail Verifier</h1>
+            <p>فحص حسابات Gmail - نشطة / معطلة / غير موجودة</p>
+        </div>
+        <div class="card">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="processed">0</div><div class="stat-label">تم الفحص</div></div>
+                <div class="stat-card"><div class="stat-value" id="live">0</div><div class="stat-label">✅ نشطة</div></div>
+                <div class="stat-card"><div class="stat-value" id="disabled">0</div><div class="stat-label">🔒 معطلة</div></div>
+                <div class="stat-card"><div class="stat-value" id="invalid">0</div><div class="stat-label">❌ غير موجودة</div></div>
+                <div class="stat-card"><div class="stat-value" id="speed">0</div><div class="stat-label">حساب/ثانية</div></div>
+                <div class="stat-card"><div class="stat-value" id="elapsed">0:00</div><div class="stat-label">الوقت</div></div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-start" id="startBtn">▶ بدء الفحص</button>
+                <button class="btn btn-stop" id="stopBtn" disabled>⏹ إيقاف</button>
+            </div>
+            
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            
+            <div class="results-section">
+                <div class="tabs">
+                    <button class="tab active" data-tab="live">✅ نشطة</button>
+                    <button class="tab" data-tab="disabled">🔒 معطلة</button>
+                    <button class="tab" data-tab="invalid">❌ غير موجودة</button>
+                </div>
+                <div class="results-list" id="resultsList"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let statusInterval = null;
+        let currentTab = 'live';
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                document.getElementById('processed').textContent = data.processed.toLocaleString();
+                document.getElementById('live').textContent = data.live.toLocaleString();
+                document.getElementById('disabled').textContent = data.new_disabled.toLocaleString();
+                document.getElementById('invalid').textContent = data.invalid.toLocaleString();
+                document.getElementById('speed').textContent = data.speed;
+                document.getElementById('elapsed').textContent = formatTime(data.elapsed);
+                
+                const progress = data.total > 0 ? (data.processed / data.total) * 100 : 0;
+                document.getElementById('progressBar').style.width = `${progress}%`;
+                document.getElementById('progressBar').textContent = `${Math.round(progress)}%`;
+                
+                document.getElementById('startBtn').disabled = data.is_running;
+                document.getElementById('stopBtn').disabled = !data.is_running;
+                
+                if (!data.is_running && data.processed > 0 && data.processed === data.total) {
+                    clearInterval(statusInterval);
+                }
+            } catch(e) { console.error(e); }
+        }
+        
+        async function loadResults() {
+            try {
+                const response = await fetch('/api/results');
+                const data = await response.json();
+                const results = data[currentTab] || [];
+                const container = document.getElementById('resultsList');
+                container.innerHTML = results.map(r => `<div class="result-item">${r}</div>`).join('');
+                if (results.length === 0) container.innerHTML = '<div class="result-item">لا توجد نتائج بعد</div>';
+            } catch(e) { console.error(e); }
+        }
+        
+        async function start() {
+            await fetch('/api/start', { method: 'POST' });
+            if (statusInterval) clearInterval(statusInterval);
+            statusInterval = setInterval(() => { updateStatus(); loadResults(); }, 1000);
+        }
+        
+        async function stop() {
+            await fetch('/api/stop', { method: 'POST' });
+        }
+        
+        document.getElementById('startBtn').addEventListener('click', start);
+        document.getElementById('stopBtn').addEventListener('click', stop);
+        
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentTab = tab.dataset.tab;
+                loadResults();
+            });
+        });
+        
+        updateStatus();
+        loadResults();
+        statusInterval = setInterval(() => updateStatus(), 1000);
+    </script>
+</body>
+</html>
